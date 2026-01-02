@@ -3,8 +3,13 @@ from aiogram.fsm.context import FSMContext
 from datetime import datetime, timedelta
 
 from states import GoalStates
-from keyboards import get_start_keyboard
-from db import add_goal, update_goal_status
+from keyboards import get_start_keyboard, get_replace_goal_keyboard
+from db import (
+    add_goal,
+    update_goal_status,
+    get_user_goal_for_date,
+    delete_goal
+)
 from analysis import generate_clarifying_question, brainstorm_goal_failure
 from services.ai_response_service import save_and_get_rating_keyboard
 
@@ -75,27 +80,118 @@ async def register_goals_handlers(dp, session_maker, bot):
         target_date = datetime.now() + timedelta(days=1)
 
         if session_maker:
-            await add_goal(
+            # Проверяем, есть ли уже цель на эту дату
+            existing_goal = await get_user_goal_for_date(
                 session_maker,
                 user_id,
-                goal_text,
-                result_text,
                 target_date
             )
-            await message.answer(
-                f"✅ <b>Топ-цель сохранена!</b>\n\n"
-                f"🎯 <b>Задача:</b> {goal_text}\n"
-                f"🏁 <b>Результат:</b> {result_text}\n\n"
-                f"Я напомню тебе о ней.",
-                reply_markup=get_start_keyboard(),
-                parse_mode="HTML"
-            )
+
+            if existing_goal:
+                # Сохраняем данные новой цели в state для возможной замены
+                await state.update_data(
+                    new_goal_text=goal_text,
+                    new_result_text=result_text,
+                    existing_goal_id=existing_goal.id
+                )
+                await state.set_state(GoalStates.confirming_replace)
+
+                await message.answer(
+                    f"⚠️ <b>У тебя уже есть цель на завтра:</b>\n\n"
+                    f"🎯 {existing_goal.goal_text}\n"
+                    f"🏁 Результат: {existing_goal.result_text}\n\n"
+                    f"<b>Новая цель:</b>\n"
+                    f"🎯 {goal_text}\n"
+                    f"🏁 Результат: {result_text}\n\n"
+                    f"Заменить старую цель на новую?",
+                    reply_markup=get_replace_goal_keyboard(),
+                    parse_mode="HTML"
+                )
+            else:
+                # Нет существующей цели, просто сохраняем
+                await add_goal(
+                    session_maker,
+                    user_id,
+                    goal_text,
+                    result_text,
+                    target_date
+                )
+                await message.answer(
+                    f"✅ <b>Топ-цель сохранена!</b>\n\n"
+                    f"🎯 <b>Задача:</b> {goal_text}\n"
+                    f"🏁 <b>Результат:</b> {result_text}\n\n"
+                    f"Я напомню тебе о ней.",
+                    reply_markup=get_start_keyboard(),
+                    parse_mode="HTML"
+                )
+                await state.clear()
         else:
             await message.answer(
                 "Ошибка: База данных не подключена.",
                 reply_markup=get_start_keyboard()
             )
+            await state.clear()
 
+    @dp.callback_query(
+        F.data.startswith("replace_goal:"),
+        GoalStates.confirming_replace
+    )
+    async def process_replace_goal(
+        callback: types.CallbackQuery,
+        state: FSMContext
+    ):
+        nonlocal session_maker
+        action = callback.data.split(":")[1]
+        data = await state.get_data()
+
+        if action == "yes":
+            # Заменяем цель
+            existing_goal_id = data.get('existing_goal_id')
+            new_goal_text = data.get('new_goal_text')
+            new_result_text = data.get('new_result_text')
+            user_id = callback.from_user.id
+            target_date = datetime.now() + timedelta(days=1)
+
+            if session_maker and existing_goal_id:
+                # Удаляем старую цель
+                await delete_goal(session_maker, existing_goal_id)
+                # Добавляем новую цель
+                await add_goal(
+                    session_maker,
+                    user_id,
+                    new_goal_text,
+                    new_result_text,
+                    target_date
+                )
+
+                await callback.message.edit_text(
+                    f"✅ <b>Топ-цель заменена!</b>\n\n"
+                    f"🎯 <b>Задача:</b> {new_goal_text}\n"
+                    f"🏁 <b>Результат:</b> {new_result_text}\n\n"
+                    f"Я напомню тебе о ней.",
+                    parse_mode="HTML"
+                )
+                await callback.message.answer(
+                    "Выбери действие:",
+                    reply_markup=get_start_keyboard()
+                )
+            else:
+                await callback.message.edit_text(
+                    "Ошибка при замене цели.",
+                    parse_mode="HTML"
+                )
+        else:
+            # Отмена замены
+            await callback.message.edit_text(
+                "❌ Замена отменена. Старая цель сохранена.",
+                parse_mode="HTML"
+            )
+            await callback.message.answer(
+                "Выбери действие:",
+                reply_markup=get_start_keyboard()
+            )
+
+        await callback.answer()
         await state.clear()
 
     @dp.callback_query(F.data.startswith("goal_done:"))

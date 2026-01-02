@@ -97,6 +97,33 @@ async def get_active_goals_for_date(session_maker: async_sessionmaker[AsyncSessi
         result = await session.execute(stmt)
         return result.scalars().all()
 
+async def get_user_goal_for_date(
+    session_maker: async_sessionmaker[AsyncSession],
+    user_id: int,
+    target_date
+):
+    """Получает активную цель пользователя на конкретную дату"""
+    from sqlalchemy import cast, Date
+    async with session_maker() as session:
+        stmt = select(GoalEntry).where(
+            (GoalEntry.user_id == user_id) &
+            (cast(GoalEntry.target_date, Date) == target_date.date()) &
+            (GoalEntry.is_completed == 0)
+        ).order_by(GoalEntry.created_at.desc()).limit(1)
+        result = await session.execute(stmt)
+        return result.scalars().first()
+
+async def delete_goal(
+    session_maker: async_sessionmaker[AsyncSession],
+    goal_id: int
+):
+    """Удаляет цель по ID"""
+    from sqlalchemy import delete
+    async with session_maker() as session:
+        async with session.begin():
+            stmt = delete(GoalEntry).where(GoalEntry.id == goal_id)
+            await session.execute(stmt)
+
 async def update_goal_status(session_maker: async_sessionmaker[AsyncSession], goal_id, is_completed: int):
     from sqlalchemy import update
     async with session_maker() as session:

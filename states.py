@@ -15,6 +15,7 @@ class GoalStates(StatesGroup):
     """Состояния для работы с целями"""
     setting_goal = State()
     setting_result = State()
+    confirming_replace = State()
     brainstorming_failure = State()
 
 

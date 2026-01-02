@@ -167,3 +167,21 @@ def get_goal_check_keyboard(goal_id: int) -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def get_replace_goal_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для подтверждения замены цели"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Заменить",
+                    callback_data="replace_goal:yes"
+                ),
+                InlineKeyboardButton(
+                    text="❌ Отмена",
+                    callback_data="replace_goal:no"
+                )
+            ]
+        ]
+    )
