@@ -22,27 +22,37 @@ async def register_journal_handlers(dp, session_maker):
             reply_markup=get_emotions_keyboard()
         )
 
-    async def ask_location(message: types.Message, state: FSMContext):
+    async def ask_location(callback_or_message, state: FSMContext):
+        """Вспомогательная функция для запроса места"""
         await state.set_state(TriggerJournal.location)
-        await message.answer(
-            "Где ты находишься?",
-            reply_markup=get_location_keyboard()
-        )
-
-    @dp.message(TriggerJournal.emotion)
-    async def process_emotion(
-        message: types.Message,
-        state: FSMContext
-    ):
-        if message.text == "✏️ Другое":
-            await state.set_state(TriggerJournal.emotion_custom)
-            await message.answer(
-                "Напиши, что ты чувствовал:",
-                reply_markup=types.ReplyKeyboardRemove()
+        text = "Где ты находишься?"
+        if isinstance(callback_or_message, types.CallbackQuery):
+            await callback_or_message.message.edit_text(
+                text,
+                reply_markup=get_location_keyboard()
             )
         else:
-            await state.update_data(emotion=message.text)
-            await ask_location(message, state)
+            await callback_or_message.answer(
+                text,
+                reply_markup=get_location_keyboard()
+            )
+
+    @dp.callback_query(F.data.startswith("emotion:"), TriggerJournal.emotion)
+    async def process_emotion(
+        callback: types.CallbackQuery,
+        state: FSMContext
+    ):
+        emotion_value = callback.data.split(":", 1)[1]
+
+        if emotion_value == "custom":
+            await state.set_state(TriggerJournal.emotion_custom)
+            await callback.message.edit_text(
+                "Напиши, что ты чувствовал:"
+            )
+        else:
+            await state.update_data(emotion=emotion_value)
+            await ask_location(callback, state)
+        await callback.answer()
 
     @dp.message(TriggerJournal.emotion_custom)
     async def process_emotion_custom(
@@ -52,27 +62,35 @@ async def register_journal_handlers(dp, session_maker):
         await state.update_data(emotion=message.text)
         await ask_location(message, state)
 
-    async def ask_company(message: types.Message, state: FSMContext):
+    async def ask_company(callback_or_message, state: FSMContext):
+        """Вспомогательная функция для запроса компании"""
         await state.set_state(TriggerJournal.company)
-        await message.answer(
-            "Кто рядом с тобой?",
-            reply_markup=get_company_keyboard()
-        )
-
-    @dp.message(TriggerJournal.location)
-    async def process_location(
-        message: types.Message,
-        state: FSMContext
-    ):
-        if message.text == "✏️ Другое":
-            await state.set_state(TriggerJournal.location_custom)
-            await message.answer(
-                "Где именно?",
-                reply_markup=types.ReplyKeyboardRemove()
+        text = "Кто рядом с тобой?"
+        if isinstance(callback_or_message, types.CallbackQuery):
+            await callback_or_message.message.edit_text(
+                text,
+                reply_markup=get_company_keyboard()
             )
         else:
-            await state.update_data(location=message.text)
-            await ask_company(message, state)
+            await callback_or_message.answer(
+                text,
+                reply_markup=get_company_keyboard()
+            )
+
+    @dp.callback_query(F.data.startswith("location:"), TriggerJournal.location)
+    async def process_location(
+        callback: types.CallbackQuery,
+        state: FSMContext
+    ):
+        location_value = callback.data.split(":", 1)[1]
+
+        if location_value == "custom":
+            await state.set_state(TriggerJournal.location_custom)
+            await callback.message.edit_text("Где именно?")
+        else:
+            await state.update_data(location=location_value)
+            await ask_company(callback, state)
+        await callback.answer()
 
     @dp.message(TriggerJournal.location_custom)
     async def process_location_custom(
@@ -83,35 +101,62 @@ async def register_journal_handlers(dp, session_maker):
         await ask_company(message, state)
 
     async def finish_log(
-        message: types.Message,
+        callback_or_message,
         state: FSMContext,
         company_text: str
     ):
+        """Завершение записи срыва"""
         nonlocal session_maker
         data = await state.get_data()
         emotion = data['emotion']
         location = data['location']
 
+        # Получаем user_id в зависимости от типа объекта
+        if isinstance(callback_or_message, types.CallbackQuery):
+            user_id = callback_or_message.from_user.id
+            message_obj = callback_or_message.message
+        else:
+            user_id = callback_or_message.from_user.id
+            message_obj = callback_or_message
+
         if session_maker:
             await add_entry(
                 session_maker,
-                message.from_user.id,
+                user_id,
                 emotion,
                 location,
                 company_text
             )
         else:
-            await message.answer("Ошибка: База данных не подключена.")
+            if isinstance(callback_or_message, types.CallbackQuery):
+                await callback_or_message.message.answer(
+                    "Ошибка: База данных не подключена."
+                )
+            else:
+                await callback_or_message.answer(
+                    "Ошибка: База данных не подключена."
+                )
+            return
 
         response_text = (
             f"Записано: {emotion} + {location} + {company_text}.\n\n"
         )
 
-        await message.answer(
-            response_text,
-            reply_markup=get_start_keyboard(),
-            parse_mode="HTML"
-        )
+        if isinstance(callback_or_message, types.CallbackQuery):
+            await callback_or_message.message.edit_text(
+                response_text,
+                parse_mode="HTML"
+            )
+            await callback_or_message.message.answer(
+                "Выбери действие:",
+                reply_markup=get_start_keyboard()
+            )
+        else:
+            await callback_or_message.answer(
+                response_text,
+                reply_markup=get_start_keyboard(),
+                parse_mode="HTML"
+            )
         await state.clear()
 
         # Проверка на необходимость анализа
@@ -125,24 +170,24 @@ async def register_journal_handlers(dp, session_maker):
 
             await process_analysis_with_rating(
                 session_maker,
-                message.from_user.id,
-                message,
+                user_id,
+                message_obj,
                 user_text
             )
 
-    @dp.message(TriggerJournal.company)
+    @dp.callback_query(F.data.startswith("company:"), TriggerJournal.company)
     async def process_company(
-        message: types.Message,
+        callback: types.CallbackQuery,
         state: FSMContext
     ):
-        if message.text == "✏️ Другое":
+        company_value = callback.data.split(":", 1)[1]
+
+        if company_value == "custom":
             await state.set_state(TriggerJournal.company_custom)
-            await message.answer(
-                "С кем именно?",
-                reply_markup=types.ReplyKeyboardRemove()
-            )
+            await callback.message.edit_text("С кем именно?")
         else:
-            await finish_log(message, state, message.text)
+            await finish_log(callback, state, company_value)
+        await callback.answer()
 
     @dp.message(TriggerJournal.company_custom)
     async def process_company_custom(
@@ -150,4 +195,3 @@ async def register_journal_handlers(dp, session_maker):
         state: FSMContext
     ):
         await finish_log(message, state, message.text)
-

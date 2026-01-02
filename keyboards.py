@@ -19,61 +19,115 @@ def get_start_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-def get_emotions_keyboard() -> ReplyKeyboardMarkup:
+def get_emotions_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура выбора эмоций"""
-    return ReplyKeyboardMarkup(
-        keyboard=[
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
             [
-                KeyboardButton(text="😰 Стресс"),
-                KeyboardButton(text="😐 Скука")
+                InlineKeyboardButton(
+                    text="😰 Стресс",
+                    callback_data="emotion:😰 Стресс"
+                ),
+                InlineKeyboardButton(
+                    text="😐 Скука",
+                    callback_data="emotion:😐 Скука"
+                )
             ],
             [
-                KeyboardButton(text="😠 Злость"),
-                KeyboardButton(text="😫 Усталость")
+                InlineKeyboardButton(
+                    text="😠 Злость",
+                    callback_data="emotion:😠 Злость"
+                ),
+                InlineKeyboardButton(
+                    text="😫 Усталость",
+                    callback_data="emotion:😫 Усталость"
+                )
             ],
             [
-                KeyboardButton(text="🥪 Голод"),
-                KeyboardButton(text="🐺 Одиночество")
+                InlineKeyboardButton(
+                    text="🥪 Голод",
+                    callback_data="emotion:🥪 Голод"
+                ),
+                InlineKeyboardButton(
+                    text="🐺 Одиночество",
+                    callback_data="emotion:🐺 Одиночество"
+                )
             ],
-            [KeyboardButton(text="✏️ Другое")]
-        ],
-        resize_keyboard=True
+            [
+                InlineKeyboardButton(
+                    text="✏️ Другое",
+                    callback_data="emotion:custom"
+                )
+            ]
+        ]
     )
 
 
-def get_location_keyboard() -> ReplyKeyboardMarkup:
+def get_location_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура выбора места"""
-    return ReplyKeyboardMarkup(
-        keyboard=[
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
             [
-                KeyboardButton(text="🏠 Дом"),
-                KeyboardButton(text="🏢 Работа")
+                InlineKeyboardButton(
+                    text="🏠 Дом",
+                    callback_data="location:🏠 Дом"
+                ),
+                InlineKeyboardButton(
+                    text="🏢 Работа",
+                    callback_data="location:🏢 Работа"
+                )
             ],
             [
-                KeyboardButton(text="🍷 Бар/Тусовка"),
-                KeyboardButton(text="🚶 Улица")
+                InlineKeyboardButton(
+                    text="🍷 Бар/Тусовка",
+                    callback_data="location:🍷 Бар/Тусовка"
+                ),
+                InlineKeyboardButton(
+                    text="🚶 Улица",
+                    callback_data="location:🚶 Улица"
+                )
             ],
-            [KeyboardButton(text="✏️ Другое")]
-        ],
-        resize_keyboard=True
+            [
+                InlineKeyboardButton(
+                    text="✏️ Другое",
+                    callback_data="location:custom"
+                )
+            ]
+        ]
     )
 
 
-def get_company_keyboard() -> ReplyKeyboardMarkup:
+def get_company_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура выбора компании"""
-    return ReplyKeyboardMarkup(
-        keyboard=[
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
             [
-                KeyboardButton(text="👤 Один"),
-                KeyboardButton(text="💼 Коллеги")
+                InlineKeyboardButton(
+                    text="👤 Один",
+                    callback_data="company:👤 Один"
+                ),
+                InlineKeyboardButton(
+                    text="💼 Коллеги",
+                    callback_data="company:💼 Коллеги"
+                )
             ],
             [
-                KeyboardButton(text="👫 Друзья"),
-                KeyboardButton(text="👪 Семья")
+                InlineKeyboardButton(
+                    text="👫 Друзья",
+                    callback_data="company:👫 Друзья"
+                ),
+                InlineKeyboardButton(
+                    text="👪 Семья",
+                    callback_data="company:👪 Семья"
+                )
             ],
-            [KeyboardButton(text="✏️ Другое")]
-        ],
-        resize_keyboard=True
+            [
+                InlineKeyboardButton(
+                    text="✏️ Другое",
+                    callback_data="company:custom"
+                )
+            ]
+        ]
     )
 
 
@@ -113,4 +167,3 @@ def get_goal_check_keyboard(goal_id: int) -> InlineKeyboardMarkup:
             ]
         ]
     )
-
