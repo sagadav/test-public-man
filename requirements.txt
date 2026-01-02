@@ -1,0 +1,8 @@
+aiogram
+python-dotenv
+alembic
+sqlalchemy
+asyncpg
+psycopg2-binary
+mistralai
+pytz
