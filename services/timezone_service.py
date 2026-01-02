@@ -1,60 +1,65 @@
 from datetime import datetime
 import pytz
 
+# Дефолтный часовой пояс для пользователей без установленного часового пояса
+DEFAULT_TIMEZONE = 'Asia/Yekaterinburg'  # UTC+5
+
 
 def get_user_timezone(user_settings):
     """
     Получает объект часового пояса пользователя.
-    
+    Если часовой пояс не установлен, возвращает дефолтный (UTC+5).
+
     Args:
         user_settings: Объект UserSettings или None
-        
+
     Returns:
-        pytz.timezone объект или None, если часовой пояс не установлен
+        pytz.timezone объект (дефолтный UTC+5, если часовой пояс
+        не установлен)
     """
     if not user_settings or not user_settings.timezone:
-        return None
+        return pytz.timezone(DEFAULT_TIMEZONE)
 
     try:
         return pytz.timezone(user_settings.timezone)
     except pytz.exceptions.UnknownTimeZoneError:
-        print(f"Неизвестный часовой пояс: {user_settings.timezone}")
-        return None
+        msg = (f"Неизвестный часовой пояс: {user_settings.timezone}, "
+               f"используется дефолтный {DEFAULT_TIMEZONE}")
+        print(msg)
+        return pytz.timezone(DEFAULT_TIMEZONE)
 
 
-def get_user_local_time(user_settings) -> datetime | None:
+def get_user_local_time(user_settings) -> datetime:
     """
     Получает текущее локальное время пользователя.
-    
+    Если часовой пояс не установлен, используется дефолтный (UTC+5).
+
     Args:
         user_settings: Объект UserSettings или None
-        
+
     Returns:
-        datetime объект в часовом поясе пользователя или None
+        datetime объект в часовом поясе пользователя (дефолтный UTC+5,
+        если не установлен)
     """
     user_tz = get_user_timezone(user_settings)
-    if not user_tz:
-        return None
-
     return datetime.now(user_tz)
 
 
 def is_time_for_reminder(user_settings, hour: int) -> bool:
     """
-    Проверяет, наступило ли время для напоминания в часовом поясе пользователя.
-    
+    Проверяет, наступило ли время для напоминания в часовом поясе
+    пользователя. Если часовой пояс не установлен, используется
+    дефолтный (UTC+5).
+
     Args:
         user_settings: Объект UserSettings или None
         hour: Час для проверки (например, 9 для 9:00)
-        
+
     Returns:
-        True, если текущее время пользователя соответствует указанному часу
-        и минуте (00:00)
+        True, если текущее время пользователя соответствует указанному
+        часу и минуте (00:00)
     """
     user_time = get_user_local_time(user_settings)
-    if not user_time:
-        return False
-
     return user_time.hour == hour and user_time.minute == 0
 
 
@@ -64,12 +69,12 @@ def detect_timezone_from_time(
 ) -> tuple[str | None, str]:
     """
     Определяет часовой пояс по времени, присланному пользователем.
-    
+
     Args:
         user_time_str: Время в формате "HH:MM" или "H:MM"
         popular_timezones: Список популярных часовых поясов
             в формате [(tz_name, label), ...]
-        
+
     Returns:
         Tuple (timezone_name, error_message)
         timezone_name - название часового пояса или None
@@ -160,4 +165,3 @@ def detect_timezone_from_time(
         return None, error_msg
     except Exception as e:
         return None, f"Ошибка при определении часового пояса: {str(e)}"
-

@@ -158,3 +158,41 @@ async def get_all_users_with_timezone(session_maker: async_sessionmaker[AsyncSes
         stmt = select(UserSettings).where(UserSettings.timezone.isnot(None))
         result = await session.execute(stmt)
         return result.scalars().all()
+
+class UserSettingsStub:
+    """Заглушка для UserSettings для пользователей без настроек"""
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.timezone = None
+
+async def get_all_users_with_goals(session_maker: async_sessionmaker[AsyncSession]):
+    """
+    Получает всех пользователей, у которых есть цели.
+    Возвращает UserSettings для каждого пользователя (создает заглушку, если его нет).
+    """
+    async with session_maker() as session:
+        # Получаем всех уникальных user_id из GoalEntry
+        from sqlalchemy import distinct
+        stmt_goals = select(distinct(GoalEntry.user_id))
+        result_goals = await session.execute(stmt_goals)
+        user_ids = list(result_goals.scalars().all())
+        
+        if not user_ids:
+            return []
+        
+        # Получаем UserSettings для этих пользователей
+        stmt_settings = select(UserSettings).where(UserSettings.user_id.in_(user_ids))
+        result_settings = await session.execute(stmt_settings)
+        existing_settings = {settings.user_id: settings for settings in result_settings.scalars().all()}
+        
+        # Создаем UserSettings или заглушку для пользователей без настроек
+        all_settings = []
+        for user_id in user_ids:
+            if user_id in existing_settings:
+                all_settings.append(existing_settings[user_id])
+            else:
+                # Создаем заглушку для пользователя без настроек
+                # timezone_service обработает это и использует дефолтный UTC+5
+                all_settings.append(UserSettingsStub(user_id))
+        
+        return all_settings

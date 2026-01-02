@@ -4,7 +4,7 @@ from aiogram import Bot
 
 from db import (
     get_active_goals_for_date,
-    get_all_users_with_timezone
+    get_all_users_with_goals
 )
 from keyboards import get_goal_check_keyboard
 from services.timezone_service import is_time_for_reminder
@@ -64,16 +64,14 @@ async def scheduler_loop(bot: Bot, session_maker):
             await asyncio.sleep(60)
             continue
 
-        # Получаем всех пользователей с установленным часовым поясом
-        users_with_tz = await get_all_users_with_timezone(session_maker)
+        # Получаем всех пользователей, у которых есть цели
+        # Для пользователей без часового пояса будет использоваться UTC+5
+        users_with_goals = await get_all_users_with_goals(session_maker)
 
-        for user_settings in users_with_tz:
+        for user_settings in users_with_goals:
             user_id = user_settings.user_id
             from services.timezone_service import get_user_local_time
             user_time = get_user_local_time(user_settings)
-            
-            if not user_time:
-                continue
 
             # Используем дату пользователя для проверки
             user_date = user_time.date()
@@ -121,5 +119,4 @@ async def scheduler_loop(bot: Bot, session_maker):
         }
 
         # Ждем 60 секунд до следующей проверки
-        await asyncio.sleep(60)
-
+        await asyncio.sleep(30)
