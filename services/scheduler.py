@@ -119,4 +119,4 @@ async def scheduler_loop(bot: Bot, session_maker):
         }
 
         # Ждем 60 секунд до следующей проверки
-        await asyncio.sleep(30)
+        await asyncio.sleep(60)
