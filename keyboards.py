@@ -185,3 +185,17 @@ def get_replace_goal_keyboard() -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def get_new_goal_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для создания новой цели на завтра"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🎯 Создать новую цель на завтра",
+                    callback_data="new_goal_tomorrow"
+                )
+            ]
+        ]
+    )

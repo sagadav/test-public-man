@@ -3,7 +3,11 @@ from aiogram.fsm.context import FSMContext
 from datetime import datetime, timedelta
 
 from states import GoalStates
-from keyboards import get_start_keyboard, get_replace_goal_keyboard
+from keyboards import (
+    get_start_keyboard,
+    get_replace_goal_keyboard,
+    get_new_goal_keyboard
+)
 from db import (
     add_goal,
     update_goal_status,
@@ -203,8 +207,33 @@ async def register_goals_handlers(dp, session_maker, bot):
             await callback.message.edit_text(
                 f"{callback.message.text}\n\n"
                 f"✅ <b>Отлично! Цель выполнена. Так держать!</b>",
-                parse_mode="HTML"
+                parse_mode="HTML",
+                reply_markup=get_new_goal_keyboard()
             )
+        await callback.answer()
+
+    @dp.callback_query(F.data == "new_goal_tomorrow")
+    async def start_new_goal_from_callback(
+        callback: types.CallbackQuery,
+        state: FSMContext
+    ):
+        """Обработчик для создания новой цели через inline кнопку"""
+        await state.set_state(GoalStates.setting_goal)
+        goal_description = (
+            "<b>🎯 Что такое Топ-цель?</b>\n\n"
+            "Это одна главная задача на завтра, "
+            "которая продвинет тебя вперед. "
+            "Чтобы она работала, она должна быть:\n"
+            "1. <b>Конкретной</b> (что именно сделать?)\n"
+            "2. <b>Измеримой</b> (как понять, что готово?)\n"
+            "3. <b>Достижимой</b> (занимает 2-6 часов времени).\n\n"
+            "Напиши свою Топ-цель на завтра:"
+        )
+        await callback.message.answer(
+            goal_description,
+            parse_mode="HTML",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("goal_fail:"))
@@ -286,7 +315,7 @@ async def register_goals_handlers(dp, session_maker, bot):
 
         # Отправляем главное меню отдельным сообщением
         await message.answer(
-            "Выбери действие:",
+            "Не сдавайтесь! Добавьте новую цель на завтра.",
             reply_markup=get_start_keyboard()
         )
         await state.clear()
