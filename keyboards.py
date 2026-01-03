@@ -12,6 +12,7 @@ def get_start_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text="🔴 Записать срыв")],
             [KeyboardButton(text="🎯 Топ-цель на завтра")],
+            [KeyboardButton(text="📊 Анализ ваших целей")],
             [KeyboardButton(text="📜 История")],
             [KeyboardButton(text="⚙️ Настройки")]
         ],

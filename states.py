@@ -17,6 +17,7 @@ class GoalStates(StatesGroup):
     setting_result = State()
     confirming_replace = State()
     brainstorming_failure = State()
+    analyzing_goals = State()
 
 
 class SettingsStates(StatesGroup):

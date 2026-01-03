@@ -14,8 +14,75 @@ from db import (
     get_user_goal_for_date,
     delete_goal
 )
-from analysis import generate_clarifying_question, brainstorm_goal_failure
+from analysis import (
+    generate_clarifying_question,
+    brainstorm_goal_failure,
+    analyze_goals_list
+)
 from services.ai_response_service import save_and_get_rating_keyboard
+
+# Максимальная длина сообщения в Telegram (с запасом для безопасности)
+MAX_MESSAGE_LENGTH = 4000
+
+
+def split_long_message(
+    text: str, max_length: int = MAX_MESSAGE_LENGTH
+) -> list[str]:
+    """
+    Разбивает длинный текст на части, не превышающие max_length символов.
+    Старается разбивать по переносам строк, чтобы не разрывать структуру.
+    
+    Args:
+        text: Текст для разбиения
+        max_length: Максимальная длина одной части
+        
+    Returns:
+        Список частей текста
+    """
+    if len(text) <= max_length:
+        return [text]
+    
+    parts = []
+    current_part = ""
+    
+    # Разбиваем по переносам строк
+    lines = text.split('\n')
+    
+    for line in lines:
+        # Если текущая часть + новая строка помещается
+        if len(current_part) + len(line) + 1 <= max_length:
+            if current_part:
+                current_part += '\n' + line
+            else:
+                current_part = line
+        else:
+            # Сохраняем текущую часть и начинаем новую
+            if current_part:
+                parts.append(current_part)
+            
+            # Если одна строка слишком длинная, разбиваем её
+            if len(line) > max_length:
+                # Разбиваем длинную строку по словам
+                words = line.split(' ')
+                current_part = ""
+                for word in words:
+                    if len(current_part) + len(word) + 1 <= max_length:
+                        if current_part:
+                            current_part += ' ' + word
+                        else:
+                            current_part = word
+                    else:
+                        if current_part:
+                            parts.append(current_part)
+                        current_part = word
+            else:
+                current_part = line
+    
+    # Добавляем последнюю часть
+    if current_part:
+        parts.append(current_part)
+    
+    return parts
 
 
 async def register_goals_handlers(dp, session_maker, bot):
@@ -316,6 +383,170 @@ async def register_goals_handlers(dp, session_maker, bot):
         # Отправляем главное меню отдельным сообщением
         await message.answer(
             "Не сдавайтесь! Добавьте новую цель на завтра.",
+            reply_markup=get_start_keyboard()
+        )
+        await state.clear()
+
+    @dp.message(F.text == "📊 Анализ ваших целей")
+    async def start_goals_analysis(
+        message: types.Message,
+        state: FSMContext
+    ):
+        """Начало процесса анализа целей - запрос списка"""
+        await state.set_state(GoalStates.analyzing_goals)
+        await message.answer(
+            "<b>📊 Анализ ваших целей</b>\n\n"
+            "Отправьте список ваших целей для анализа.\n\n"
+            "Можно отправить цели в любом формате:\n"
+            "• Каждая цель с новой строки\n"
+            "• Через запятую\n"
+            "• С номерами или без\n\n"
+            "<i>Пример:</i>\n"
+            "1. Написать отчет по проекту\n"
+            "2. Подготовить презентацию\n"
+            "3. Провести встречу с командой",
+            parse_mode="HTML",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
+
+    @dp.message(GoalStates.analyzing_goals)
+    async def process_goals_analysis(
+        message: types.Message,
+        state: FSMContext
+    ):
+        """Обработка списка целей и их анализ"""
+        nonlocal session_maker
+        user_id = message.from_user.id
+
+        if not session_maker:
+            await message.answer(
+                "Ошибка: База данных не подключена.",
+                reply_markup=get_start_keyboard()
+            )
+            await state.clear()
+            return
+
+        # Парсим список целей из текста
+        goals_text = message.text.strip()
+        
+        # Разбиваем на отдельные цели
+        # Пробуем разные разделители: перенос строки, запятая, точка с запятой
+        if '\n' in goals_text:
+            goals_list = [g.strip() for g in goals_text.split('\n') if g.strip()]
+        elif ';' in goals_text:
+            goals_list = [g.strip() for g in goals_text.split(';') if g.strip()]
+        elif ',' in goals_text:
+            goals_list = [g.strip() for g in goals_text.split(',') if g.strip()]
+        else:
+            # Если одна цель
+            goals_list = [goals_text]
+
+        # Убираем номера и маркеры в начале строк
+        cleaned_goals = []
+        for goal in goals_list:
+            # Убираем номера (1., 2., и т.д.)
+            goal = goal.lstrip('0123456789. ')
+            # Убираем маркеры (-, •, *, и т.д.)
+            goal = goal.lstrip('- •*→ ')
+            if goal:
+                cleaned_goals.append(goal)
+
+        if not cleaned_goals:
+            await message.answer(
+                "❌ Не удалось распознать цели в вашем сообщении.\n\n"
+                "Пожалуйста, отправьте список целей еще раз, "
+                "каждая цель с новой строки или через запятую.",
+                parse_mode="HTML"
+            )
+            return
+
+        await message.answer(
+            f"🔍 Анализирую цели ({len(cleaned_goals)})... "
+            "Это может занять несколько секунд."
+        )
+
+        # Анализируем цели
+        analysis_result = await analyze_goals_list(cleaned_goals)
+
+        # Форматируем результат
+        response_text = "<b>📊 Анализ ваших целей</b>\n\n"
+
+        # Топ-цель дня
+        if analysis_result.get('top_goal'):
+            top_goal = analysis_result['top_goal']
+            response_text += (
+                f"<b>🎯 Топ-цель дня:</b>\n"
+                f"{top_goal.get('goal', 'Не определена')}\n\n"
+                f"<i>{top_goal.get('reason', '')}</i>\n\n"
+            )
+
+        # SMART анализ каждой цели
+        smart_analysis = analysis_result.get('smart_analysis', [])
+        if smart_analysis:
+            response_text += "<b>📋 SMART-анализ целей:</b>\n\n"
+            
+            for idx, goal_analysis in enumerate(smart_analysis, 1):
+                goal_text = goal_analysis.get('goal', 'Цель')
+                smart = goal_analysis.get('smart', {})
+                overall_score = goal_analysis.get('overall_score', 0)
+                recommendations = goal_analysis.get('recommendations', '')
+
+                response_text += f"<b>{idx}. {goal_text}</b>\n"
+                response_text += f"📊 Общий балл SMART: <b>{overall_score:.1f}/10</b>\n\n"
+
+                # Детали по каждому критерию SMART
+                smart_criteria = {
+                    'specific': 'S (Конкретность)',
+                    'measurable': 'M (Измеримость)',
+                    'achievable': 'A (Достижимость)',
+                    'relevant': 'R (Релевантность)',
+                    'time_bound': 'T (Ограниченность во времени)'
+                }
+
+                for key, label in smart_criteria.items():
+                    criterion = smart.get(key, {})
+                    score = criterion.get('score', 0)
+                    comment = criterion.get('comment', '')
+                    response_text += f"  {label}: {score}/10\n"
+                    if comment:
+                        response_text += f"    <i>{comment}</i>\n"
+
+                if recommendations:
+                    response_text += f"\n💡 <b>Рекомендации:</b> {recommendations}\n"
+
+                response_text += "\n" + "─" * 30 + "\n\n"
+
+        # Сохраняем ответ AI для оценки
+        user_text = f"Анализ {len(cleaned_goals)} целей: {', '.join(cleaned_goals[:3])}"
+        ai_response_text = response_text
+        kb_rating = await save_and_get_rating_keyboard(
+            session_maker,
+            user_id,
+            user_text,
+            ai_response_text
+        )
+
+        # Разбиваем длинное сообщение на части
+        message_parts = split_long_message(response_text)
+        
+        # Отправляем все части, кроме последней
+        for part in message_parts[:-1]:
+            await message.answer(
+                part,
+                parse_mode="HTML"
+            )
+        
+        # Последнюю часть отправляем с клавиатурой оценки
+        if message_parts:
+            await message.answer(
+                message_parts[-1],
+                parse_mode="HTML",
+                reply_markup=kb_rating
+            )
+
+        # Возвращаем главное меню
+        await message.answer(
+            "Выбери действие:",
             reply_markup=get_start_keyboard()
         )
         await state.clear()
