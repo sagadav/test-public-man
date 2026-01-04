@@ -8,7 +8,7 @@ from keyboards import (
     get_company_keyboard,
     get_start_keyboard
 )
-from db import add_entry
+from repositories import JournalRepository
 
 
 async def register_journal_handlers(dp, session_maker):
@@ -16,6 +16,7 @@ async def register_journal_handlers(dp, session_maker):
 
     @dp.message(F.text == "🔴 Записать срыв")
     async def start_log(message: types.Message, state: FSMContext):
+        await state.clear()
         await state.set_state(TriggerJournal.emotion)
         await message.answer(
             "Что ты чувствовал за 5 минут до этого?",
@@ -119,24 +120,13 @@ async def register_journal_handlers(dp, session_maker):
             user_id = callback_or_message.from_user.id
             message_obj = callback_or_message
 
-        if session_maker:
-            await add_entry(
-                session_maker,
-                user_id,
-                emotion,
-                location,
-                company_text
-            )
-        else:
-            if isinstance(callback_or_message, types.CallbackQuery):
-                await callback_or_message.message.answer(
-                    "Ошибка: База данных не подключена."
-                )
-            else:
-                await callback_or_message.answer(
-                    "Ошибка: База данных не подключена."
-                )
-            return
+        journal_repo = JournalRepository(session_maker)
+        await journal_repo.add_entry(
+            user_id,
+            emotion,
+            location,
+            company_text
+        )
 
         response_text = (
             f"Записано: {emotion} + {location} + {company_text}.\n\n"
@@ -159,21 +149,18 @@ async def register_journal_handlers(dp, session_maker):
             )
         await state.clear()
 
-        # Проверка на необходимость анализа
-        if session_maker:
-            from services.analysis_service import process_analysis_with_rating
+        from services.analysis_service import process_analysis_with_rating
 
-            # Формируем текст пользователя для сохранения
-            user_text = (
-                f"Запись триггера: {emotion} + {location} + {company_text}"
-            )
+        user_text = (
+            f"Запись триггера: {emotion} + {location} + {company_text}"
+        )
 
-            await process_analysis_with_rating(
-                session_maker,
-                user_id,
-                message_obj,
-                user_text
-            )
+        await process_analysis_with_rating(
+            session_maker,
+            user_id,
+            message_obj,
+            user_text
+        )
 
     @dp.callback_query(F.data.startswith("company:"), TriggerJournal.company)
     async def process_company(

@@ -1,4 +1,4 @@
-from db import add_ai_response
+from repositories import AIRepository
 from keyboards import get_rating_keyboard
 
 
@@ -16,8 +16,8 @@ async def save_ai_response(
         return None
 
     try:
-        response_id = await add_ai_response(
-            session_maker,
+        ai_repo = AIRepository(session_maker)
+        response_id = await ai_repo.add_ai_response(
             user_id,
             user_text,
             ai_response

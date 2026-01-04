@@ -1,9 +1,5 @@
 from datetime import datetime, timedelta
-from db import (
-    get_latest_analysis,
-    get_entries_since,
-    add_analysis
-)
+from repositories import AnalysisRepository, JournalRepository
 from analysis import analyze_with_mistral
 
 
@@ -15,12 +11,13 @@ async def should_analyze_entries(session_maker, user_id: int) -> bool:
     - Нет предыдущих анализов И есть >= 3 записей за неделю
     - Последний анализ был > 3 дней назад И есть >= 3 новых записей
     """
-    last_analysis = await get_latest_analysis(session_maker, user_id)
+    analysis_repo = AnalysisRepository(session_maker)
+    last_analysis = await analysis_repo.get_latest_analysis(user_id)
 
     if not last_analysis:
         # Если анализов нет, проверяем количество записей
-        entries_week = await get_entries_since(
-            session_maker,
+        journal_repo = JournalRepository(session_maker)
+        entries_week = await journal_repo.get_entries_since(
             user_id,
             datetime.now() - timedelta(days=7)
         )
@@ -44,8 +41,8 @@ async def analyze_user_entries(session_maker, user_id: int) -> str:
     Анализирует записи пользователя за последнюю неделю.
     Возвращает результат анализа.
     """
-    recent_entries = await get_entries_since(
-        session_maker,
+    journal_repo = JournalRepository(session_maker)
+    recent_entries = await journal_repo.get_entries_since(
         user_id,
         datetime.now() - timedelta(days=7)
     )
@@ -86,7 +83,8 @@ async def process_analysis_if_needed(
             )
 
             # Сохраняем и отправляем
-            await add_analysis(session_maker, user_id, analysis_result)
+            analysis_repo = AnalysisRepository(session_maker)
+            await analysis_repo.add_analysis(user_id, analysis_result)
             await send_message_func(
                 analysis_result,
                 parse_mode="Markdown"
@@ -127,7 +125,8 @@ async def process_analysis_with_rating(
             )
 
             # Сохраняем в таблицу анализов
-            await add_analysis(session_maker, user_id, analysis_result)
+            analysis_repo = AnalysisRepository(session_maker)
+            await analysis_repo.add_analysis(user_id, analysis_result)
 
             # Формируем текст пользователя, если не передан
             if user_text is None:

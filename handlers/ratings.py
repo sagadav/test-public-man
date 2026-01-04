@@ -1,6 +1,6 @@
 from aiogram import types, F
 
-from db import update_ai_rating
+from repositories import AIRepository
 
 
 async def register_ratings_handlers(dp, session_maker):
@@ -11,17 +11,13 @@ async def register_ratings_handlers(dp, session_maker):
         nonlocal session_maker
         try:
             response_id = int(callback.data.split(":")[1])
-            if session_maker:
-                await update_ai_rating(session_maker, response_id, 1)
-                await callback.answer(
-                    "Спасибо за оценку! 👍",
-                    show_alert=False
-                )
-            else:
-                await callback.answer(
-                    "Ошибка: База данных не подключена.",
-                    show_alert=True
-                )
+
+            ai_repo = AIRepository(session_maker)
+            await ai_repo.update_ai_rating(response_id, 1)
+            await callback.answer(
+                "Спасибо за оценку! 👍",
+                show_alert=False
+            )
         except (ValueError, IndexError) as e:
             print(f"Ошибка при обработке оценки: {e}")
             await callback.answer(
@@ -34,17 +30,13 @@ async def register_ratings_handlers(dp, session_maker):
         nonlocal session_maker
         try:
             response_id = int(callback.data.split(":")[1])
-            if session_maker:
-                await update_ai_rating(session_maker, response_id, -1)
-                await callback.answer(
-                    "Спасибо за оценку! 👎",
-                    show_alert=False
-                )
-            else:
-                await callback.answer(
-                    "Ошибка: База данных не подключена.",
-                    show_alert=True
-                )
+
+            ai_repo = AIRepository(session_maker)
+            await ai_repo.update_ai_rating(response_id, -1)
+            await callback.answer(
+                "Спасибо за оценку! 👎",
+                show_alert=False
+            )
         except (ValueError, IndexError) as e:
             print(f"Ошибка при обработке оценки: {e}")
             await callback.answer(

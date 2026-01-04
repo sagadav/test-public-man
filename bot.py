@@ -2,9 +2,10 @@ import asyncio
 from aiogram import Bot, Dispatcher
 
 from config import TOKEN
-from db import init_session_maker
+from database import init_session_maker
 from handlers import start, journal, goals, ratings, settings
 from services.scheduler import scheduler_loop
+from middleware import DatabaseCheckMiddleware
 
 
 async def main():
@@ -20,6 +21,10 @@ async def main():
         print("База данных (ORM) подключена успешно.")
     except Exception as e:
         print(f"Ошибка подключения к БД: {e}")
+
+    # Регистрация middleware для проверки подключения БД
+    dp.message.middleware(DatabaseCheckMiddleware(session_maker))
+    dp.callback_query.middleware(DatabaseCheckMiddleware(session_maker))
 
     # Регистрация всех обработчиков
     await start.register_start_handlers(dp, session_maker)

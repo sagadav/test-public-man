@@ -4,7 +4,7 @@ from datetime import datetime
 import pytz
 
 from states import SettingsStates
-from db import set_user_timezone, get_user_settings
+from repositories import UserRepository
 from services.timezone_service import detect_timezone_from_time
 
 
@@ -26,12 +26,11 @@ async def register_settings_handlers(dp, session_maker):
     """Регистрация обработчиков для настроек"""
 
     @dp.message(F.text == "⚙️ Настройки")
-    async def show_settings(message: types.Message):
+    async def show_settings(message: types.Message, state: FSMContext):
+        await state.clear()
         nonlocal session_maker
-        user_settings = await get_user_settings(
-            session_maker,
-            message.from_user.id
-        )
+        user_repo = UserRepository(session_maker)
+        user_settings = await user_repo.get_user_settings(message.from_user.id)
 
         current_tz = user_settings.timezone if user_settings else None
         tz_info = ""
@@ -109,8 +108,8 @@ async def register_settings_handlers(dp, session_maker):
         if timezone:
             # Сохраняем часовой пояс
             try:
-                await set_user_timezone(
-                    session_maker,
+                user_repo = UserRepository(session_maker)
+                await user_repo.set_user_timezone(
                     message.from_user.id,
                     timezone
                 )
@@ -152,8 +151,8 @@ async def register_settings_handlers(dp, session_maker):
         try:
             # Проверяем валидность часового пояса
             pytz.timezone(timezone)
-            await set_user_timezone(
-                session_maker,
+            user_repo = UserRepository(session_maker)
+            await user_repo.set_user_timezone(
                 callback.from_user.id,
                 timezone
             )

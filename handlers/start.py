@@ -1,15 +1,17 @@
 from aiogram import types, F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 
 from keyboards import get_start_keyboard
-from db import get_entries
+from repositories import JournalRepository
 
 
 async def register_start_handlers(dp, session_maker):
     """Регистрация обработчиков для команды /start и истории"""
-    
+
     @dp.message(Command("start"))
-    async def cmd_start(message: types.Message):
+    async def cmd_start(message: types.Message, state: FSMContext):
+        await state.clear()
         await message.answer(
             "Привет! У этого бота 2 функции:\n"
             "1. Я помогу тебе исследовать триггеры твоих привычек, "
@@ -23,13 +25,12 @@ async def register_start_handlers(dp, session_maker):
         )
 
     @dp.message(F.text == "📜 История")
-    async def show_history(message: types.Message):
+    async def show_history(message: types.Message, state: FSMContext):
+        await state.clear()
         nonlocal session_maker
-        if not session_maker:
-            await message.answer("Ошибка: База данных не подключена.")
-            return
 
-        entries = await get_entries(session_maker, message.from_user.id)
+        journal_repo = JournalRepository(session_maker)
+        entries = await journal_repo.get_entries(message.from_user.id)
 
         if not entries:
             await message.answer("У тебя пока нет записей.")
@@ -46,4 +47,3 @@ async def register_start_handlers(dp, session_maker):
             )
 
         await message.answer(text_response, parse_mode="HTML")
-

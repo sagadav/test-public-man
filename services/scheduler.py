@@ -2,10 +2,7 @@ import asyncio
 from datetime import datetime
 from aiogram import Bot
 
-from db import (
-    get_active_goals_for_date,
-    get_all_users_with_goals
-)
+from repositories import GoalRepository, UserRepository
 from keyboards import get_goal_check_keyboard
 from services.timezone_service import is_time_for_reminder
 
@@ -66,7 +63,8 @@ async def scheduler_loop(bot: Bot, session_maker):
 
         # Получаем всех пользователей, у которых есть цели
         # Для пользователей без часового пояса будет использоваться UTC+5
-        users_with_goals = await get_all_users_with_goals(session_maker)
+        user_repo = UserRepository(session_maker)
+        users_with_goals = await user_repo.get_all_users_with_goals()
 
         for user_settings in users_with_goals:
             user_id = user_settings.user_id
@@ -81,10 +79,8 @@ async def scheduler_loop(bot: Bot, session_maker):
                 reminder_key = (user_id, 'morning')
                 if sent_reminders.get(reminder_key) != user_date:
                     # Получаем активные цели пользователя на сегодня
-                    goals = await get_active_goals_for_date(
-                        session_maker,
-                        user_time
-                    )
+                    goal_repo = GoalRepository(session_maker)
+                    goals = await goal_repo.get_active_goals_for_date(user_time)
                     for goal in goals:
                         if goal.user_id == user_id:
                             await send_morning_reminder(
@@ -98,10 +94,8 @@ async def scheduler_loop(bot: Bot, session_maker):
             if is_time_for_reminder(user_settings, 21):
                 reminder_key = (user_id, 'evening')
                 if sent_reminders.get(reminder_key) != user_date:
-                    goals = await get_active_goals_for_date(
-                        session_maker,
-                        user_time
-                    )
+                    goal_repo = GoalRepository(session_maker)
+                    goals = await goal_repo.get_active_goals_for_date(user_time)
                     for goal in goals:
                         if goal.user_id == user_id:
                             await send_evening_check(
