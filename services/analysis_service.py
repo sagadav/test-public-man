@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from repositories import AnalysisRepository, JournalRepository
-from analysis import analyze_with_mistral
+from services.journal_analysis_service import analyze_with_mistral
 
 
 async def should_analyze_entries(session_maker, user_id: int) -> bool:
@@ -67,9 +67,6 @@ async def process_analysis_if_needed(
     Проверяет и запускает анализ записей, если необходимо.
     Отправляет результаты пользователю.
     """
-    if not session_maker:
-        return
-
     try:
         if await should_analyze_entries(session_maker, user_id):
             await send_message_func(
@@ -109,9 +106,6 @@ async def process_analysis_with_rating(
         message: Объект сообщения для отправки ответа
         user_text: Текст пользователя для сохранения (опционально)
     """
-    if not session_maker:
-        return
-
     try:
         if await should_analyze_entries(session_maker, user_id):
             await message.answer(

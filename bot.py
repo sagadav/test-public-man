@@ -5,7 +5,7 @@ from config import TOKEN
 from database import init_session_maker
 from handlers import start, journal, goals, ratings, settings
 from services.scheduler import scheduler_loop
-from middleware import DatabaseCheckMiddleware
+from middleware import DatabaseCheckMiddleware, ErrorHandlerMiddleware
 
 
 async def main():
@@ -25,6 +25,10 @@ async def main():
     # Регистрация middleware для проверки подключения БД
     dp.message.middleware(DatabaseCheckMiddleware(session_maker))
     dp.callback_query.middleware(DatabaseCheckMiddleware(session_maker))
+
+    # Регистрация middleware для обработки ошибок
+    dp.message.middleware(ErrorHandlerMiddleware())
+    dp.callback_query.middleware(ErrorHandlerMiddleware())
 
     # Регистрация всех обработчиков
     await start.register_start_handlers(dp, session_maker)

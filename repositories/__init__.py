@@ -3,7 +3,7 @@ from .journal_repository import JournalRepository
 from .analysis_repository import AnalysisRepository
 from .goal_repository import GoalRepository
 from .ai_repository import AIRepository
-from .user_repository import UserRepository, UserSettingsStub
+from .user_repository import UserRepository
 
 __all__ = [
     'JournalRepository',
@@ -11,6 +11,5 @@ __all__ = [
     'GoalRepository',
     'AIRepository',
     'UserRepository',
-    'UserSettingsStub',
 ]
 

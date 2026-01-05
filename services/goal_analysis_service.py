@@ -1,68 +1,33 @@
-import os
 import json
 import re
-from mistralai import Mistral
-from dotenv import load_dotenv
+from services.mistral_client import get_mistral_client
 
-load_dotenv()
-
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
-
-async def analyze_with_mistral(entries_text):
-    if not MISTRAL_API_KEY:
-        return "Ошибка: MISTRAL_API_KEY не найден."
-    
-    client = Mistral(api_key=MISTRAL_API_KEY)
-    
-    prompt = f"""
-    Ты - эмпатичный психолог-аналитик, работающий в подходе КПТ.
-    Проанализируй следующие записи о срывах пользователя:
-    
-    {entries_text}
-    
-    Дай краткую сводку, выдели основные паттерны (триггеры, места, эмоции) и дай 1-2 конкретных, мягких рекомендации.
-    Не используй сложные термины, пиши дружелюбно. Пиши так будто обращаешся к самому пользователю.
-
-    Структура ответа:
-    Анализ на данный момент:
-    1. Краткая сводка
-    2. Основные паттерны (триггеры, места, эмоции)
-    3. 1-2 конкретных, мягких рекомендации
-    """
-    
-    try:
-        chat_response = await client.chat.complete_async(
-            model="mistral-tiny",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ]
-        )
-        return chat_response.choices[0].message.content
-    except Exception as e:
-        return f"Ошибка при анализе: {e}"
 
 async def generate_clarifying_question(goal_text):
-    if not MISTRAL_API_KEY:
-        return "Чтобы ясно понять результат: какой один документ или решение должно быть готово к концу этих 2 часов?"
-    
-    client = Mistral(api_key=MISTRAL_API_KEY)
-    
+    client = get_mistral_client()
+    if not client:
+        return (
+            "Чтобы ясно понять результат: какой один документ или "
+            "решение должно быть готово к концу этих 2 часов?"
+        )
+
     prompt = f"""
     Пользователь поставил себе цель на завтра: "{goal_text}".
-    
-    Твоя задача - задать ОДИН уточняющий вопрос, который поможет пользователю определить максимально конкретный, осязаемый результат (outcome). 
-    Вопрос должен быть в стиле: Чтобы ясно понять результат: какой один документ или решение должно быть готово к концу дня?
-    
-    Пиши кратко, эмпатично и профессионально. Не пиши лишнего текста, только вопрос. Пиши на русском.
+
+    Твоя задача - задать ОДИН уточняющий вопрос, который поможет
+    пользователю определить максимально конкретный, осязаемый
+    результат (outcome).
+    Вопрос должен быть в стиле: Чтобы ясно понять результат: какой
+    один документ или решение должно быть готово к концу дня?
+
+    Пиши кратко, эмпатично и профессионально. Не пиши лишнего текста,
+    только вопрос. Пиши на русском.
     Проверь свою грамматику и орфографию.
 
     Структура ответа:
     1. Уточняющий вопрос
     """
-    
+
     try:
         chat_response = await client.chat.complete_async(
             model="mistral-tiny",
@@ -76,31 +41,40 @@ async def generate_clarifying_question(goal_text):
         return chat_response.choices[0].message.content
     except Exception as e:
         print(f"Mistral error: {e}")
-        return "Чтобы ясно понять результат: какой один документ или решение должно быть готово к концу этих 2 часов?"
+        return (
+            "Чтобы ясно понять результат: какой один документ или "
+            "решение должно быть готово к концу этих 2 часов?"
+        )
+
 
 async def brainstorm_goal_failure(goal_text, result_text, reason):
-    if not MISTRAL_API_KEY:
+    client = get_mistral_client()
+    if not client:
         return "Ничего страшного. Завтра будет новый шанс!"
-    
-    client = Mistral(api_key=MISTRAL_API_KEY)
     
     prompt = f"""
     Пользователь не выполнил свою топ-цель на сегодня.
     Цель: "{goal_text}"
     Ожидаемый результат: "{result_text}"
     Причина невыполнения: "{reason}"
-    
-    Ты - опытный коуч по продуктивности. Твоя задача - провести краткий брейншторм и дать ОДИН самый ценный, контекстный совет, который поможет избежать этой помехи завтра.
-    
+
+    Ты - опытный коуч по продуктивности. Твоя задача - провести
+    краткий брейншторм и дать ОДИН самый ценный, контекстный совет,
+    который поможет избежать этой помехи завтра.
+
     Используй следующие ментальные модели:
-    - Если помеха "срочные задачи" -> советуй "защищенное время" (time blocking).
-    - Если помеха "сложно начать" -> советуй разбить на 15-минутный первый шаг или метод Pomodoro.
-    - Если помеха "усталость" -> советуй пересмотреть масштаб цели или выбрать время с пиком энергии.
-    - Если причина другая -> дай глубокий инсайт на основе КПТ или тайм-менеджмента.
-    
+    - Если помеха "срочные задачи" -> советуй "защищенное время"
+      (time blocking).
+    - Если помеха "сложно начать" -> советуй разбить на 15-минутный
+      первый шаг или метод Pomodoro.
+    - Если помеха "усталость" -> советуй пересмотреть масштаб цели
+      или выбрать время с пиком энергии.
+    - Если причина другая -> дай глубокий инсайт на основе КПТ
+      или тайм-менеджмента.
+
     Пиши кратко (3-4 предложения), эмпатично и по делу. Без воды.
     """
-    
+
     try:
         chat_response = await client.chat.complete_async(
             model="mistral-medium",
@@ -114,17 +88,22 @@ async def brainstorm_goal_failure(goal_text, result_text, reason):
         return chat_response.choices[0].message.content
     except Exception as e:
         print(f"Mistral brainstorm error: {e}")
-        return "Ничего страшного. Попробуй проанализировать, что именно пошло не так, и завтра сделай шаг поменьше."
+        return (
+            "Ничего страшного. Попробуй проанализировать, что именно "
+            "пошло не так, и завтра сделай шаг поменьше."
+        )
 
 
 async def analyze_goals_list(goals_list):
     """
-    Анализирует список целей и определяет топ-цель дня, а также анализирует каждую цель по SMART.
-    
+    Анализирует список целей и определяет топ-цель дня,
+    а также анализирует каждую цель по SMART.
+
     Args:
-        goals_list: Список целей. Может быть списком строк или списком объектов GoalEntry.
+        goals_list: Список целей. Может быть списком строк или
+                   списком объектов GoalEntry.
                    Если это GoalEntry, используется goal_text.
-    
+
     Returns:
         dict: {
             'top_goal': {
@@ -135,7 +114,8 @@ async def analyze_goals_list(goals_list):
                 {
                     'goal': str,  # Текст цели
                     'smart': {
-                        'specific': {'score': int, 'comment': str},  # 0-10, комментарий
+                        'specific': {'score': int, 'comment': str},
+                        # 0-10, комментарий
                         'measurable': {'score': int, 'comment': str},
                         'achievable': {'score': int, 'comment': str},
                         'relevant': {'score': int, 'comment': str},
@@ -147,7 +127,8 @@ async def analyze_goals_list(goals_list):
             ]
         }
     """
-    if not MISTRAL_API_KEY:
+    client = get_mistral_client()
+    if not client:
         return {
             'top_goal': {
                 'goal': goals_list[0] if goals_list else '',
@@ -169,10 +150,9 @@ async def analyze_goals_list(goals_list):
             'smart_analysis': []
         }
     
-    client = Mistral(api_key=MISTRAL_API_KEY)
-    
-    # Формируем список целей для промпта
-    goals_formatted = "\n".join([f"{i+1}. {goal}" for i, goal in enumerate(goals_text_list)])
+    goals_formatted = "\n".join([
+        f"{i+1}. {goal}" for i, goal in enumerate(goals_text_list)
+    ])
     
     prompt = f"""
     Ты - опытный коуч по продуктивности и тайм-менеджменту. Проанализируй список целей пользователя и выполни две задачи:
@@ -251,19 +231,15 @@ async def analyze_goals_list(goals_list):
         
         response_text = chat_response.choices[0].message.content.strip()
         
-        # Пытаемся извлечь JSON из ответа (на случай, если есть дополнительный текст)
-        # Ищем JSON объект в тексте
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
         if json_match:
             json_str = json_match.group(0)
         else:
             json_str = response_text
         
-        # Парсим JSON ответ
         try:
             result = json.loads(json_str)
             
-            # Валидация структуры результата
             if 'top_goal' not in result:
                 result['top_goal'] = {
                     'goal': goals_text_list[0] if goals_text_list else '',
@@ -275,12 +251,14 @@ async def analyze_goals_list(goals_list):
             return result
         except json.JSONDecodeError as e:
             print(f"Ошибка парсинга JSON от Mistral: {e}")
-            print(f"Ответ: {response_text[:500]}...")  # Первые 500 символов для отладки
-            # Возвращаем базовую структуру с первой целью как топ-цель
+            print(f"Ответ: {response_text[:500]}...")
             return {
                 'top_goal': {
                     'goal': goals_text_list[0] if goals_text_list else '',
-                    'reason': 'Ошибка при парсинге ответа AI. Используется первая цель из списка.'
+                    'reason': (
+                        'Ошибка при парсинге ответа AI. '
+                        'Используется первая цель из списка.'
+                    )
                 },
                 'smart_analysis': []
             }
@@ -294,3 +272,4 @@ async def analyze_goals_list(goals_list):
             },
             'smart_analysis': []
         }
+

@@ -46,7 +46,7 @@ async def register_settings_handlers(dp, session_maker):
                 tz_info = f"\n\nТекущий часовой пояс: {current_tz}"
 
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        
+
         # Создаем клавиатуру с опциями
         settings_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
@@ -62,7 +62,7 @@ async def register_settings_handlers(dp, session_maker):
                 )
             ]
         ])
-        
+
         await message.answer(
             f"⚙️ <b>Настройки</b>{tz_info}\n\n"
             "Выбери способ установки часового пояса:",
@@ -104,43 +104,34 @@ async def register_settings_handlers(dp, session_maker):
             user_time_str,
             POPULAR_TIMEZONES
         )
-        
+
         if timezone:
-            # Сохраняем часовой пояс
-            try:
-                user_repo = UserRepository(session_maker)
-                await user_repo.set_user_timezone(
-                    message.from_user.id,
-                    timezone
-                )
-                
-                # Получаем информацию о часовом поясе
-                tz = pytz.timezone(timezone)
-                tz_now = datetime.now(tz)
-                offset = tz_now.strftime("%z")
-                offset_formatted = f"{offset[:3]}:{offset[3:]}"
-                
-                await message.answer(
-                    f"✅ <b>Часовой пояс определен и установлен!</b>\n\n"
-                    f"📍 Часовой пояс: <b>{timezone}</b>\n"
-                    f"⏰ Смещение: <b>UTC{offset_formatted}</b>\n\n"
-                    f"Напоминания будут приходить в 9:00 и 21:00 "
-                    f"по твоему местному времени.",
-                    parse_mode="HTML"
-                )
-            except Exception as e:
-                print(f"Ошибка при сохранении часового пояса: {e}")
-                await message.answer(
-                    "❌ Ошибка при сохранении часового пояса. "
-                    "Попробуй еще раз или выбери часовой пояс вручную."
-                )
+            user_repo = UserRepository(session_maker)
+            await user_repo.set_user_timezone(
+                message.from_user.id,
+                timezone
+            )
+
+            tz = pytz.timezone(timezone)
+            tz_now = datetime.now(tz)
+            offset = tz_now.strftime("%z")
+            offset_formatted = f"{offset[:3]}:{offset[3:]}"
+
+            await message.answer(
+                f"✅ <b>Часовой пояс определен и установлен!</b>\n\n"
+                f"📍 Часовой пояс: <b>{timezone}</b>\n"
+                f"⏰ Смещение: <b>UTC{offset_formatted}</b>\n\n"
+                f"Напоминания будут приходить в 9:00 и 21:00 "
+                f"по твоему местному времени.",
+                parse_mode="HTML"
+            )
         else:
             await message.answer(
                 f"❌ {error_msg}\n\n"
                 "Попробуй еще раз или выбери часовой пояс из списка.",
                 parse_mode="HTML"
             )
-        
+
         await state.clear()
 
     @dp.callback_query(F.data.startswith("set_tz:"))
@@ -149,36 +140,31 @@ async def register_settings_handlers(dp, session_maker):
         timezone = callback.data.split(":")[1]
 
         try:
-            # Проверяем валидность часового пояса
             pytz.timezone(timezone)
-            user_repo = UserRepository(session_maker)
-            await user_repo.set_user_timezone(
-                callback.from_user.id,
-                timezone
-            )
-            tz_message = f"Часовой пояс установлен: {timezone}"
-            await callback.answer(
-                tz_message,
-                show_alert=True
-            )
-            await callback.message.edit_text(
-                f"✅ <b>Часовой пояс установлен!</b>\n\n"
-                f"Часовой пояс: {timezone}\n\n"
-                f"Напоминания будут приходить в 9:00 и 21:00 "
-                f"по твоему местному времени.",
-                parse_mode="HTML"
-            )
         except pytz.exceptions.UnknownTimeZoneError:
             await callback.answer(
                 "Ошибка: Неизвестный часовой пояс",
                 show_alert=True
             )
-        except Exception as e:
-            print(f"Ошибка при установке часового пояса: {e}")
-            await callback.answer(
-                "Ошибка при сохранении настроек",
-                show_alert=True
-            )
+            return
+
+        user_repo = UserRepository(session_maker)
+        await user_repo.set_user_timezone(
+            callback.from_user.id,
+            timezone
+        )
+        tz_message = f"Часовой пояс установлен: {timezone}"
+        await callback.answer(
+            tz_message,
+            show_alert=True
+        )
+        await callback.message.edit_text(
+            f"✅ <b>Часовой пояс установлен!</b>\n\n"
+            f"Часовой пояс: {timezone}\n\n"
+            f"Напоминания будут приходить в 9:00 и 21:00 "
+            f"по твоему местному времени.",
+            parse_mode="HTML"
+        )
 
 
 def get_timezone_keyboard():

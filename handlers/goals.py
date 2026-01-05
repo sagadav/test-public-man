@@ -9,7 +9,7 @@ from keyboards import (
     get_new_goal_keyboard
 )
 from repositories import GoalRepository
-from analysis import (
+from services.goal_analysis_service import (
     generate_clarifying_question,
     brainstorm_goal_failure,
     analyze_goals_list

@@ -12,9 +12,6 @@ async def save_ai_response(
     Сохраняет ответ AI в базу данных.
     Возвращает ID сохраненной записи или None в случае ошибки.
     """
-    if not session_maker:
-        return None
-
     try:
         ai_repo = AIRepository(session_maker)
         response_id = await ai_repo.add_ai_response(

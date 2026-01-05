@@ -57,10 +57,6 @@ async def scheduler_loop(bot: Bot, session_maker):
     sent_reminders = {}
 
     while True:
-        if not session_maker:
-            await asyncio.sleep(60)
-            continue
-
         # Получаем всех пользователей, у которых есть цели
         # Для пользователей без часового пояса будет использоваться UTC+5
         user_repo = UserRepository(session_maker)
